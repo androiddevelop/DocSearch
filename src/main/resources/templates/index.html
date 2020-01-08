@@ -1,0 +1,236 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="static/css/autosuggest.min.css" rel="stylesheet">
+    <script src="static/js/jquery.min.js"></script>
+    <script src="static/js/bootstrap.min.js"></script>
+    <script src="static/js/jquery.autosuggest.js"></script>
+    <script src="static/js/layer/layer.js"></script>
+    <link rel="icon" href="static/img/favicon.png" type="image/x-icon"/>
+    <link rel="shortcut icon" href="static/img/favicon.png" type="image/x-icon">
+    <title>前端文档搜索</title>
+    <style type="text/css">
+        a {
+            text-decoration: none;
+        }
+
+        .big-font {
+            font-size: 18px;
+            height: auto;
+        }
+
+        .bg {
+            background: #F6EAE5;
+        }
+
+        .blur {
+            -webkit-filter: blur(5px);
+            -ms-filter: blur(5px);
+            filter: blur(5px);
+        }
+
+        .panel-body {
+            background-color: #002B36 !important;
+            color: #93A1A1 !important;
+        }
+
+        pre {
+            background-color: #002B36 !important;
+            color: #93A1A1 !important;
+            border: 0 !important;
+            padding: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        .dropdown-menu .divider {
+            margin: 0 !important;
+        }
+
+        .dropdown-menu > li > a {
+            line-height: 2.5;
+            font-weight: bold;
+        }
+
+        .title {
+            font-size: 20px;
+            line-height: 1.3;
+        }
+
+        a:visited {
+            color: #609;
+            cursor: pointer;
+        }
+
+        a {
+            text-decoration: none;
+            text-decoration-style: initial;
+            text-decoration-color: initial;
+        }
+
+        .list-group-item {
+            color: #666;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .list-group-item:hover {
+            background-color: #eee;
+        }
+
+        .url {
+            font-size: 16px;
+            padding-top: 1px;
+            line-height: 1.5;
+            color: #006621;
+            display: inline-block;
+        }
+
+        .content {
+            line-height: 1.57;
+            font-size: 14px;
+            color: #545454;
+        }
+
+        .highlight {
+            padding-left: 1px;
+            padding-right: 1px;
+            background-color: #FFFE60;
+        }
+
+        .search-item {
+            margin-bottom: 27px;
+        }
+
+        .badge {
+            min-width: 27px;
+        }
+
+    </style>
+</head>
+<body style="height: 100%; color: rgb(0, 0, 0); -ms-overflow-x: hidden; padding-top: 10px;">
+<div class="container">
+    <div class="search-box" style="padding:50px 0 5px 0; z-index: 100; background-color: #ffffff">
+        <input type="text" class="form-control big-font bg" id="text" autofocus="autofocus"
+               placeholder="前端文档搜索，输入关键字，回车查询">
+    </div>
+
+    <div class="search-content" style="padding-top: 20px;">
+        <div class="list-group" id="content">
+        </div>
+    </div>
+
+    <div class="search-hot" style="padding-top: 20px;">
+        <ul class="list-group" id="hotTopic">
+        </ul>
+    </div>
+</div>
+
+<script>
+    function openDoc(url) {
+        window.open(url, "_blank");
+    }
+
+    function getRealUrl(targetUrl) {
+        let index = targetUrl.indexOf('=');
+        if (index !== -1) {
+            return decodeURIComponent(targetUrl.substring(index + 1));
+        }
+        return targetUrl;
+    }
+
+    $(document).ready(function () {
+        const colors = ['lightcoral', 'lightgreen', 'lightskyblue', 'lightsalmon', 'lightseagreen', 'lightcoral', 'lightpink', 'lightblue', 'lightgray', 'lightpink'];
+        // 自动联想
+        $('#text').autosuggest({
+            queryParamName: 'keyword',
+            url: '/api/suggest',
+            nextStep: function () {
+                search();
+            }
+        });
+
+        const searchContent = $(".search-content");
+        const searchHot = $(".search-hot");
+        const hotTopic = $("#hotTopic");
+
+        searchHotTopic();
+
+        function search() {
+            const keyword = $("#text").val().trim();
+            if (keyword.length === 0) {
+                searchHotTopic();
+                return;
+            }
+            layer.load(2);
+            searchContent.addClass("blur");
+            searchHot.hide();
+            searchContent.show();
+            $.ajax({
+                type: 'POST',
+                url: "/api/query",
+                data: {'keyword': encodeURI(keyword)},
+                dataType: 'json',
+                success: function (data) {
+                    if (data.success) {
+                        const list_group = $("#content");
+                        list_group.empty();
+                        const res = data.data;
+                        let domStr = '';
+                        for (let i = 0; i < res.length; i++) {
+                            domStr = domStr + "<div class='search-item'>";
+                            domStr = domStr + "<div><a target='_blank' href='" + res[i].url + "'><div class='title'>" + res[i].title + "</div><div class='url'>" + getRealUrl(res[i].url) + "</div></a></div>";
+                            domStr = domStr + "<div class='content'>" + res[i].content + "</div>";
+                            domStr = domStr + "</div>";
+                        }
+                        list_group.html(domStr);
+                    } else {
+                        layer.msg(data.message);
+                    }
+
+                    layer.closeAll('loading');
+                    searchContent.removeClass("blur");
+                }
+            });
+        }
+
+        // 搜索热词
+        function searchHotTopic() {
+            layer.load(2);
+            searchContent.hide();
+            searchHot.show();
+            searchHot.addClass("blur");
+            $.ajax({
+                type: 'POST',
+                url: "/api/queryHot",
+                dataType: 'json',
+                success: function (data) {
+                    if (data.success) {
+                        hotTopic.empty();
+                        const res = data.data;
+                        let domStr = '';
+                        for (let i = 0; i < res.length; i++) {
+                            const index = i + 1;
+                            let color = '#ccc';
+                            if (i < 10) {
+                                color = colors[i];
+                            }
+                            const indexText = '<span style="padding-left: 5px;padding-right: 10px; color:' + color + ' ">' + index + '.</span>';
+                            domStr = domStr + "<li class=\"list-group-item\" onclick=\"openDoc('" + res[i].url + "')\">" + indexText + res[i].title + "<span class=\"badge\" style=\"float:right;background:" + color + "\">" + res[i].times + "</span></li>";
+                        }
+                        hotTopic.html(domStr);
+                    } else {
+                        layer.msg(data.message);
+                    }
+
+                    layer.closeAll('loading');
+                    searchHot.removeClass("blur");
+                }
+            });
+        }
+    });
+</script>
+
+</body>
+</html>
